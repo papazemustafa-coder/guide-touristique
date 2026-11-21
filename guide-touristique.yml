@@ -1,0 +1,929 @@
+
+openapi: 3.1.0
+
+info:
+  title: API de gestion des guides touristiques
+  version: 1.0.0
+  description: >
+    API REST de gestion des guides touristiques, de constitution de CV
+    professionnels, de candidature et d'examen d'évaluation.
+
+servers:
+  - url: http://localhost:8080
+    description: Environnement local
+
+tags:
+  - name: Guides
+    description: Gestion des profils professionnels
+  - name: CV
+    description: Constitution et consultation des CV
+  - name: Candidatures
+    description: Soumission et suivi des dossiers d'évaluation
+  - name: Sessions
+    description: Organisation des examens
+  - name: Evaluations
+    description: Notation et publication des résultats
+
+paths:
+
+  /api/v1/guides:
+    post:
+      tags: [Guides]
+      operationId: creerGuide
+      summary: Créer le profil d'un guide touristique
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuideCreation'
+      responses:
+        '201':
+          description: Profil créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guide'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+    get:
+      tags: [Guides]
+      operationId: rechercherGuides
+      summary: Rechercher des guides touristiques
+      parameters:
+        - name: nom
+          in: query
+          schema:
+            type: string
+        - name: langue
+          in: query
+          schema:
+            type: string
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: statut
+          in: query
+          schema:
+            $ref: '#/components/schemas/StatutGuide'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: taille
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Liste des guides
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Guide'
+
+  /api/v1/guides/{guideId}:
+    parameters:
+      - $ref: '#/components/parameters/GuideId'
+
+    get:
+      tags: [Guides]
+      operationId: consulterGuide
+      summary: Consulter un profil professionnel
+      responses:
+        '200':
+          description: Profil trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guide'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+
+    put:
+      tags: [Guides]
+      operationId: modifierGuide
+      summary: Modifier un profil professionnel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GuideModification'
+      responses:
+        '200':
+          description: Profil modifié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Guide'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+
+    delete:
+      tags: [Guides]
+      operationId: supprimerGuide
+      summary: Supprimer un profil non soumis
+      description: >
+        La suppression est refusée si le dossier est soumis ou si des
+        obligations de conservation des données s'appliquent.
+      responses:
+        '204':
+          description: Profil supprimé
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+  /api/v1/guides/{guideId}/cv:
+    parameters:
+      - $ref: '#/components/parameters/GuideId'
+
+    get:
+      tags: [CV]
+      operationId: consulterCVGuide
+      summary: Consulter le CV professionnel
+      responses:
+        '200':
+          description: CV disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CVGuide'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+
+    put:
+      tags: [CV]
+      operationId: enregistrerCVGuide
+      summary: Créer ou mettre à jour le CV
+      description: >
+        Le CV est modifiable avant la soumission du dossier.
+        Une candidature soumise doit conserver une copie figée du CV.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CVGuideSaisie'
+      responses:
+        '200':
+          description: CV enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CVGuide'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+  /api/v1/guides/{guideId}/cv/export:
+    parameters:
+      - $ref: '#/components/parameters/GuideId'
+
+    post:
+      tags: [CV]
+      operationId: exporterCVGuide
+      summary: Générer une version PDF du CV
+      responses:
+        '200':
+          description: Document PDF généré
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+  /api/v1/guides/{guideId}/candidatures:
+    parameters:
+      - $ref: '#/components/parameters/GuideId'
+
+    post:
+      tags: [Candidatures]
+      operationId: soumettreCandidature
+      summary: Soumettre un dossier pour examen
+      description: >
+        Le système vérifie la complétude du profil et du CV puis
+        conserve une version du CV associée au dossier.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidatureCreation'
+      responses:
+        '201':
+          description: Candidature soumise
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidature'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+    get:
+      tags: [Candidatures]
+      operationId: listerCandidaturesGuide
+      summary: Consulter les candidatures d'un guide
+      responses:
+        '200':
+          description: Candidatures du guide
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Candidature'
+
+  /api/v1/candidatures/{candidatureId}:
+    parameters:
+      - $ref: '#/components/parameters/CandidatureId'
+
+    get:
+      tags: [Candidatures]
+      operationId: consulterCandidature
+      summary: Consulter un dossier d'évaluation
+      responses:
+        '200':
+          description: Dossier trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Candidature'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+
+  /api/v1/sessions-evaluation:
+    get:
+      tags: [Sessions]
+      operationId: rechercherSessionsEvaluation
+      summary: Consulter les sessions d'examen
+      parameters:
+        - name: region
+          in: query
+          schema:
+            type: string
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [PLANIFIEE, OUVERTE, CLOTUREE, ANNULEE]
+      responses:
+        '200':
+          description: Sessions disponibles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SessionEvaluation'
+
+    post:
+      tags: [Sessions]
+      operationId: creerSessionEvaluation
+      summary: Créer une session d'examen
+      description: Opération réservée à un administrateur habilité.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionEvaluationCreation'
+      responses:
+        '201':
+          description: Session créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEvaluation'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+  /api/v1/candidatures/{candidatureId}/convocation:
+    parameters:
+      - $ref: '#/components/parameters/CandidatureId'
+
+    post:
+      tags: [Candidatures]
+      operationId: convoquerCandidat
+      summary: Convoquer un candidat à un examen
+      description: Opération réservée à un gestionnaire habilité.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvocationCreation'
+      responses:
+        '200':
+          description: Convocation enregistrée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Convocation'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+  /api/v1/candidatures/{candidatureId}/resultats:
+    parameters:
+      - $ref: '#/components/parameters/CandidatureId'
+
+    post:
+      tags: [Evaluations]
+      operationId: enregistrerResultatEvaluation
+      summary: Enregistrer le résultat de l'examen
+      description: >
+        Opération réservée à un évaluateur habilité.
+        Les critères et seuils doivent être définis par l'organisme
+        responsable de l'examen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResultatEvaluationSaisie'
+      responses:
+        '201':
+          description: Résultat enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultatEvaluation'
+        '400':
+          $ref: '#/components/responses/RequeteInvalide'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+        '409':
+          $ref: '#/components/responses/Conflit'
+
+    get:
+      tags: [Evaluations]
+      operationId: consulterResultatEvaluation
+      summary: Consulter le résultat d'un examen
+      description: >
+        Le candidat ne peut consulter que son propre résultat.
+        L'accès complet est réservé aux personnes habilitées.
+      responses:
+        '200':
+          description: Résultat disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultatEvaluation'
+        '404':
+          $ref: '#/components/responses/RessourceIntrouvable'
+
+components:
+
+  parameters:
+    GuideId:
+      name: guideId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+    CandidatureId:
+      name: candidatureId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+  schemas:
+
+    Guide:
+      type: object
+      required:
+        - id
+        - prenom
+        - nom
+        - email
+        - region
+        - statut
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+          example: 1
+        prenom:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Aminata"
+        nom:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: "Diop"
+        email:
+          type: string
+          format: email
+          example: "aminata@example.sn"
+        telephone:
+          type: [string, "null"]
+          example: "+221771234567"
+        photoUrl:
+          type: [string, "null"]
+          format: uri
+        region:
+          type: string
+          example: "Dakar"
+        ville:
+          type: [string, "null"]
+          example: "Gorée"
+        adresseProfessionnelle:
+          type: [string, "null"]
+        specialites:
+          type: array
+          items:
+            type: string
+          example: ["Patrimoine historique", "Tourisme culturel"]
+        statut:
+          $ref: '#/components/schemas/StatutGuide'
+
+    GuideCreation:
+      type: object
+      required: [prenom, nom, email, region]
+      additionalProperties: false
+      properties:
+        prenom:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nom:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        telephone:
+          type: [string, "null"]
+        region:
+          type: string
+        ville:
+          type: [string, "null"]
+        adresseProfessionnelle:
+          type: [string, "null"]
+        specialites:
+          type: array
+          items:
+            type: string
+
+    GuideModification:
+      type: object
+      required: [prenom, nom, email, region]
+      additionalProperties: false
+      properties:
+        prenom:
+          type: string
+          minLength: 1
+          maxLength: 100
+        nom:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        telephone:
+          type: [string, "null"]
+        region:
+          type: string
+        ville:
+          type: [string, "null"]
+        adresseProfessionnelle:
+          type: [string, "null"]
+        specialites:
+          type: array
+          items:
+            type: string
+
+    StatutGuide:
+      type: string
+      enum:
+        - BROUILLON
+        - DOSSIER_SOUMIS
+        - EN_EVALUATION
+        - ADMIS
+        - NON_ADMIS
+        - HABILITE
+        - SUSPENDU
+
+    CVGuide:
+      type: object
+      required: [guideId, version, formations, experiences, langues]
+      properties:
+        guideId:
+          type: integer
+          format: int64
+          readOnly: true
+        version:
+          type: integer
+          minimum: 1
+          readOnly: true
+        titreProfessionnel:
+          type: [string, "null"]
+          example: "Guide touristique spécialisé en patrimoine culturel"
+        profilProfessionnel:
+          type: [string, "null"]
+          maxLength: 3000
+        formations:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormationGuide'
+        experiences:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperienceGuide'
+        langues:
+          type: array
+          items:
+            $ref: '#/components/schemas/LangueGuide'
+        competences:
+          type: array
+          items:
+            type: string
+        certifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificationGuide'
+        referencesProfessionnelles:
+          type: array
+          items:
+            type: string
+        dateMiseAJour:
+          type: string
+          format: date-time
+          readOnly: true
+
+    CVGuideSaisie:
+      type: object
+      required: [formations, experiences, langues]
+      additionalProperties: false
+      properties:
+        titreProfessionnel:
+          type: [string, "null"]
+          maxLength: 200
+        profilProfessionnel:
+          type: [string, "null"]
+          maxLength: 3000
+        formations:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormationGuide'
+        experiences:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExperienceGuide'
+        langues:
+          type: array
+          items:
+            $ref: '#/components/schemas/LangueGuide'
+        competences:
+          type: array
+          items:
+            type: string
+        certifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificationGuide'
+        referencesProfessionnelles:
+          type: array
+          items:
+            type: string
+
+    FormationGuide:
+      type: object
+      required: [intitule, etablissement, anneeDebut]
+      properties:
+        intitule:
+          type: string
+          example: "Licence en tourisme"
+        etablissement:
+          type: string
+          example: "Université"
+        anneeDebut:
+          type: integer
+          minimum: 1950
+        anneeFin:
+          type: [integer, "null"]
+        description:
+          type: [string, "null"]
+        diplomeObtenu:
+          type: boolean
+          default: false
+
+    ExperienceGuide:
+      type: object
+      required: [poste, organisme, dateDebut]
+      properties:
+        poste:
+          type: string
+          example: "Guide touristique"
+        organisme:
+          type: string
+        dateDebut:
+          type: string
+          format: date
+        dateFin:
+          type: [string, "null"]
+          format: date
+        enCours:
+          type: boolean
+          default: false
+        description:
+          type: [string, "null"]
+          maxLength: 3000
+        region:
+          type: [string, "null"]
+
+    LangueGuide:
+      type: object
+      required: [langue, niveau]
+      properties:
+        langue:
+          type: string
+          example: "Anglais"
+        niveau:
+          type: string
+          enum: [DEBUTANT, INTERMEDIAIRE, AVANCE, COURANT, MATERNEL]
+
+    CertificationGuide:
+      type: object
+      required: [intitule, organisme]
+      properties:
+        intitule:
+          type: string
+        organisme:
+          type: string
+        dateObtention:
+          type: [string, "null"]
+          format: date
+        reference:
+          type: [string, "null"]
+
+    CandidatureCreation:
+      type: object
+      required: [sessionId, confirmationExactitude]
+      additionalProperties: false
+      properties:
+        sessionId:
+          type: integer
+          format: int64
+        confirmationExactitude:
+          type: boolean
+          const: true
+          description: Le candidat confirme l'exactitude des informations.
+        commentaire:
+          type: [string, "null"]
+          maxLength: 2000
+
+    Candidature:
+      type: object
+      required: [id, guideId, sessionId, statut, dateSoumission]
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        guideId:
+          type: integer
+          format: int64
+        sessionId:
+          type: integer
+          format: int64
+        versionCV:
+          type: integer
+          minimum: 1
+          readOnly: true
+        statut:
+          type: string
+          enum:
+            - SOUMISE
+            - A_COMPLETER
+            - RECEVABLE
+            - CONVOQUEE
+            - EN_EVALUATION
+            - EVALUEE
+            - ADMISE
+            - NON_ADMISE
+        dateSoumission:
+          type: string
+          format: date-time
+          readOnly: true
+        commentaire:
+          type: [string, "null"]
+          readOnly: true
+
+    SessionEvaluationCreation:
+      type: object
+      required: [intitule, region, dateDebut, dateFin, capacite]
+      additionalProperties: false
+      properties:
+        intitule:
+          type: string
+          example: "Examen des guides touristiques - Dakar"
+        region:
+          type: string
+        lieu:
+          type: string
+        dateDebut:
+          type: string
+          format: date-time
+        dateFin:
+          type: string
+          format: date-time
+        capacite:
+          type: integer
+          minimum: 1
+        description:
+          type: [string, "null"]
+        epreuves:
+          type: array
+          items:
+            type: string
+          example: ["Connaissances du patrimoine", "Mise en situation pratique"]
+
+    SessionEvaluation:
+      allOf:
+        - $ref: '#/components/schemas/SessionEvaluationCreation'
+        - type: object
+          required: [id, statut]
+          properties:
+            id:
+              type: integer
+              format: int64
+              readOnly: true
+            statut:
+              type: string
+              enum: [PLANIFIEE, OUVERTE, CLOTUREE, ANNULEE]
+
+    ConvocationCreation:
+      type: object
+      required: [dateHeure, lieu]
+      properties:
+        dateHeure:
+          type: string
+          format: date-time
+        lieu:
+          type: string
+        instructions:
+          type: [string, "null"]
+        dateLimiteConfirmation:
+          type: [string, "null"]
+          format: date-time
+
+    Convocation:
+      allOf:
+        - $ref: '#/components/schemas/ConvocationCreation'
+        - type: object
+          required: [id, candidatureId, statut]
+          properties:
+            id:
+              type: integer
+              format: int64
+              readOnly: true
+            candidatureId:
+              type: integer
+              format: int64
+            statut:
+              type: string
+              enum: [ENVOYEE, CONFIRMEE, DECLINEE, ANNULEE]
+
+    ResultatEvaluationSaisie:
+      type: object
+      required: [evaluateurId, notes, decision]
+      additionalProperties: false
+      properties:
+        evaluateurId:
+          type: integer
+          format: int64
+        notes:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/NoteEvaluation'
+        decision:
+          type: string
+          enum: [ADMIS, NON_ADMIS, AJOURNE]
+        appreciation:
+          type: [string, "null"]
+          maxLength: 3000
+
+    NoteEvaluation:
+      type: object
+      required: [critere, note, noteMaximale]
+      properties:
+        critere:
+          type: string
+          example: "Connaissance du patrimoine"
+        note:
+          type: number
+          minimum: 0
+        noteMaximale:
+          type: number
+          exclusiveMinimum: 0
+
+    ResultatEvaluation:
+      allOf:
+        - $ref: '#/components/schemas/ResultatEvaluationSaisie'
+        - type: object
+          required: [id, candidatureId, dateEvaluation]
+          properties:
+            id:
+              type: integer
+              format: int64
+              readOnly: true
+            candidatureId:
+              type: integer
+              format: int64
+            dateEvaluation:
+              type: string
+              format: date-time
+              readOnly: true
+            noteTotale:
+              type: number
+              readOnly: true
+            statutPublication:
+              type: string
+              enum: [BROUILLON, PUBLIE]
+              readOnly: true
+
+    Erreur:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          example: RESSOURCE_INTROUVABLE
+        message:
+          type: string
+          example: "La ressource demandée n'existe pas."
+        details:
+          type: [string, "null"]
+
+  responses:
+    RequeteInvalide:
+      description: Données invalides ou dossier incomplet
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+          example:
+            code: REQUETE_INVALIDE
+            message: "Le CV doit contenir au moins une langue."
+
+    RessourceIntrouvable:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+          example:
+            code: RESSOURCE_INTROUVABLE
+            message: "Aucun guide trouvé pour cet identifiant."
+
+    Conflit:
+      description: Conflit avec l'état actuel du dossier
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erreur'
+          example:
+            code: CONFLIT
+            message: "Le CV ne peut plus être modifié après soumission."

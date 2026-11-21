@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: guide-touristique
+  datasource:
+    url: jdbc:h2:mem:guidetouristique;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+  jackson:
+    deserialization:
+      # Le contrat declare additionalProperties: false sur les corps de saisie.
+      fail-on-unknown-properties: true
+
+app:
+  jwt:
+    # >= 32 caracteres. A surcharger par variable d'environnement hors TP.
+    secret: ${JWT_SECRET:guide-touristique-secret-key-0123456789-uasz}
+    expiration-minutes: 120
+  resultat:
+    # Seuil d'admission sur 20 : configurable, jamais code en dur.
+    seuil-admission: 10.0
